@@ -7,7 +7,7 @@ import (
 )
 
 func configCommand(config *Config) {
-	fmt.Println(fmt.Sprintf("The current configuration is located at %v.", aurora.Cyan(config.path).String()))
+	fmt.Println(fmt.Sprintf("The current configuration is located at %v.", aurora.Cyan(config.path)))
 }
 
 func helpCommand() {
@@ -34,7 +34,7 @@ func setCommand(config *Config, organization *string, limited *bool, args []stri
 	}
 
 	if len(args) < 2 {
-		fmt.Println(aurora.Red("Please supply two arguments for the status emoji and message"))
+		fmt.Println(aurora.Red("Please supply at least two arguments for the status emoji and message"))
 		return
 	}
 
@@ -49,6 +49,8 @@ func getCommand(config *Config) {
 		fmt.Println(aurora.Red("Please set your auth token for GitHub in the configuration file first!"))
 		return
 	}
+
+	fmt.Println(aurora.Gray("Retrieving your current status..."))
 
 	err := get(config)
 	if err != nil {

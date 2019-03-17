@@ -24,6 +24,15 @@ Head over to the [releases page](https://github.com/BrunoScheufler/ghstatus/rele
 
 Once you've downloaded a binary and made it executable, run it once and head over to the newly-generated config file (located in `~/.config/ghstatus/config.json` by default, you can change this behaviour by setting the `--config` flag to point to your file location of choice) and enter your GitHub access token. The token has to be permitted to access the following scopes: `user`, `read:org`.
 
+## additional notes
+
+All of the included functionality is achieved by using a few great packages, such as
+
+- [mapstructure](https://github.com/mitchellh/mapstructure) for handling JSON -> map -> struct workflows
+- [aurora](https://github.com/logrusorgru/aurora) for all of the terminal colors
+- [emoji](https://github.com/kyokomi/emoji) for the :sparkles: emoji magic
+
+
 ## license
 
 This project is licensed under the [MIT License](LICENSE.md)

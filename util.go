@@ -15,7 +15,7 @@ import (
 func fileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err != nil {
-		switch true {
+		switch {
 		case os.IsNotExist(err):
 			return false, nil
 		default:

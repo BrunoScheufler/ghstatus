@@ -52,11 +52,13 @@ func set(c *Config, emoji, message string, organization *string, limitedAvailabi
 	// Construct and send query
 	variables := map[string]interface{}{"emoji": emoji, "message": message}
 
+	// Add organization to variables
 	if organization != nil && *organization != "" {
 		// TODO add org support (requires another query to fetch organizationId by name)
 		fmt.Println("Note: Supplying an organization is currently not supported")
 	}
 
+	// Add limitedAvailability to variables
 	if limitedAvailability != nil {
 		variables["limitedAvailability"] = *limitedAvailability
 	}
@@ -81,6 +83,7 @@ func set(c *Config, emoji, message string, organization *string, limitedAvailabi
 
 	status := responseData.ChangeUserStatus.Status
 
+	// Detect if some changes weren't applied as planned
 	if status.Message != message ||
 		status.Emoji != emoji ||
 		(organization != nil && status.Organization.Name != *organization) ||

@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	// Declare and parse flags to be used
 	configPath := flag.String("config", "~/.config/ghstatus/config.json", "configuration file path")
 	organization := flag.String("org", "", "organization name")
 	busy := flag.Bool("busy", false, "limited availability")
@@ -66,8 +67,7 @@ func main() {
 		configCommand(config)
 		break
 	case "help":
-		helpCommand()
-		break
+		fallthrough
 	default:
 		helpCommand()
 		break
