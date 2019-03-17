@@ -39,6 +39,14 @@ type Viewer struct {
 	Status Status `json:"status,omitempty"`
 }
 
+type UpdateMutationResponseData struct {
+	ChangeUserStatus ChangeUserStatusMutation `json:"changeUserStatus,omitempty"`
+}
+
+type ChangeUserStatusMutation struct {
+	Status Status `json:"status,omitempty"`
+}
+
 // Queries & Mutations
 
 var retrievalQuery = `
@@ -51,6 +59,7 @@ query getStatus {
       indicatesLimitedAvailability
       organization {
         name
+        id
       }
     }
   }
@@ -64,6 +73,11 @@ mutation ($newStatus: ChangeUserStatusInput!) {
       id
       message
       emoji
+      indicatesLimitedAvailability
+      organization {
+        name
+        id
+      }
     }
   }
 }

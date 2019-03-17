@@ -16,20 +16,10 @@ func get(c *Config) error {
 		return err
 	}
 
-	// Handle potential errors
-	if len(response.Errors) > 0 {
-		for _, e := range response.Errors {
-			error := GraphQLError{}
-
-			err = mapstructure.Decode(e, &error)
-			if err != nil {
-				continue
-			}
-
-			println(error.Message)
-		}
-
-		return errors.New("request failed")
+	// Handle GraphQL errors
+	err = handleGraphQLErrors(response)
+	if err != nil {
+		return err
 	}
 
 	responseData := RetrievalQueryResponseData{}
@@ -54,6 +44,51 @@ func get(c *Config) error {
 	if status.IndicatesLimitedAvailability == true {
 		fmt.Println(aurora.Bold("Your availability is marked as limited."))
 	}
+
+	return nil
+}
+
+func set(c *Config, emoji, message string, organization *string, limitedAvailability *bool) error {
+	// Construct and send query
+	variables := map[string]interface{}{"emoji": emoji, "message": message}
+
+	if organization != nil && *organization != "" {
+		// TODO add org support (requires another query to fetch organizationId by name)
+		fmt.Println("Note: Supplying an organization is currently not supported")
+	}
+
+	if limitedAvailability != nil {
+		variables["limitedAvailability"] = *limitedAvailability
+	}
+
+	response, err := sendAPIRequest(c.data.Token, updateMutation, map[string]interface{}{"newStatus": variables})
+	if err != nil {
+		return err
+	}
+
+	err = handleGraphQLErrors(response)
+	if err != nil {
+		return err
+	}
+
+	responseData := UpdateMutationResponseData{}
+
+	// Try to decode body
+	err = mapstructure.Decode(response.Data, &responseData)
+	if err != nil {
+		return err
+	}
+
+	status := responseData.ChangeUserStatus.Status
+
+	if status.Message != message ||
+		status.Emoji != emoji ||
+		(organization != nil && status.Organization.Name != *organization) ||
+		(limitedAvailability != nil && status.IndicatesLimitedAvailability != *limitedAvailability) {
+		return errors.New("some fields were not updated accordingly, please try again")
+	}
+
+	fmt.Println(aurora.Green("🎉 Updated your status!"))
 
 	return nil
 }

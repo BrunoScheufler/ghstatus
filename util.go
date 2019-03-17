@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/logrusorgru/aurora"
+	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -97,4 +99,24 @@ func sendAPIRequest(token, query string, variables map[string]interface{}) (*Gra
 
 func validateTokenSet(c *Config) bool {
 	return c.data.Token != ""
+}
+
+func handleGraphQLErrors(response *GraphQLResponseBody) error {
+	// Handle potential errors
+	if len(response.Errors) > 0 {
+		for _, e := range response.Errors {
+			gqlError := GraphQLError{}
+
+			err := mapstructure.Decode(e, &gqlError)
+			if err != nil {
+				continue
+			}
+
+			fmt.Println(aurora.Red(fmt.Sprintf("GraphQL Error: %v.", gqlError.Message)))
+		}
+
+		return errors.New("request failed")
+	}
+
+	return nil
 }
