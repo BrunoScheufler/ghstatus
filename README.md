@@ -24,6 +24,12 @@ Head over to the [releases page](https://github.com/BrunoScheufler/ghstatus/rele
 
 Once you've downloaded a binary and made it executable, run it once and head over to the newly-generated config file (located in `~/.config/ghstatus/config.json` by default, you can change this behaviour by setting the `--config` flag to point to your file location of choice) and enter your GitHub access token. The token has to be permitted to access the following scopes: `user`, `read:org`.
 
+## usage
+
+> Note: If you want to add quotes or other special characters to your status message, please escape them correctly using backslashes.
+
+To see the full list of supported operations, simply execute `ghstatus help`.
+
 ## additional notes
 
 All of the included functionality is achieved by using a few great packages, such as

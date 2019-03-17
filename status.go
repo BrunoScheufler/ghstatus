@@ -6,6 +6,7 @@ import (
 	"github.com/kyokomi/emoji"
 	"github.com/logrusorgru/aurora"
 	"github.com/mitchellh/mapstructure"
+	"strings"
 )
 
 func get(c *Config) error {
@@ -49,6 +50,11 @@ func get(c *Config) error {
 }
 
 func set(c *Config, emoji, message string, organization *string, limitedAvailability *bool) error {
+	// Validate emoji
+	if !strings.HasPrefix(emoji, ":") || !strings.HasSuffix(emoji, ":") {
+		return errors.New("invalid emoji format, please supply a valid emoji")
+	}
+
 	// Construct and send query
 	variables := map[string]interface{}{"emoji": emoji, "message": message}
 
