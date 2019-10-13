@@ -57,7 +57,7 @@ func UpdateStatus(input *UpdateStatusInput) (*UserStatus, error) {
 
 	// Add limitedAvailability to variables
 	if input.LimitedAvailability != nil {
-		variables["limitedAvailability"] = *input.LimitedAvailability
+		updateInput.LimitedAvailability = *input.LimitedAvailability
 	}
 
 	variables["input"] = updateInput

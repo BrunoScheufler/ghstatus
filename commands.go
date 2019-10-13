@@ -39,6 +39,7 @@ func setCommand(config *Config, organization *string, limited *bool, args []stri
 	}
 
 	updateStatusInput := UpdateStatusInput{
+		Config:              config,
 		Emoji:               args[0],
 		Message:             strings.Join(args[1:], " "),
 		Organization:        organization,

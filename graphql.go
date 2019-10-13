@@ -15,14 +15,17 @@ func SendApiRequest(token, query string, variables map[string]interface{}) (json
 	requestHeaders["Authorization"] = fmt.Sprintf("Bearer %s", token)
 	requestHeaders["Content-Type"] = "application/json"
 
+	requestBody := GraphQLRequestBody{
+		Query:     query,
+		Variables: variables,
+	}
+
 	requestInput := SendRequestInput{
 		Endpoint: "https://api.github.com/graphql",
 		Headers:  requestHeaders,
-		Body: &GraphQLRequestBody{
-			Query:     query,
-			Variables: variables,
-		},
+		Body:     &requestBody,
 	}
+
 	response, err := SendGraphQLRequest(&requestInput)
 	if err != nil {
 		return nil, fmt.Errorf("could not send GraphQL request: %w", err)
