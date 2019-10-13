@@ -69,8 +69,12 @@ func UpdateStatus(input *UpdateStatusInput) (*UserStatus, error) {
 	// Handle organization, add to variables
 	if input.Organization != nil {
 		if *input.Organization != "" {
-			// TODO Add org support (requires another query to fetch organizationId by name)
-			fmt.Println("Note: Supplying an organization is currently not supported")
+			// Look up organization by name (login)
+			orgId, err := LookupOrganization(input.Config, *input.Organization)
+			if err != nil {
+				return nil, fmt.Errorf("could not lookup organization by name: %w", err)
+			}
+			updateInput.OrganizationId = orgId
 		} else {
 			updateInput.OrganizationId = *input.Organization
 		}

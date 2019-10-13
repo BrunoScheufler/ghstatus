@@ -105,6 +105,13 @@ func SendGraphQLRequest(input *SendRequestInput) (*GraphQLResponseBody, error) {
 // GitHub types
 
 // Use omitempty for optional values
+
+type OrganizationLookupQueryResponse struct {
+	Organization struct {
+		ID string `json:"id"`
+	} `json:"organization"`
+}
+
 type UpdateStatusMutationInput struct {
 	Emoji               string `json:"emoji,omitempty"`
 	Message             string `json:"message,omitempty"`
@@ -174,3 +181,11 @@ mutation UpdateUserStatusMutation ($input: ChangeUserStatusInput!) {
   }
 }
 ` + statusFragment
+
+var organizationLookupQuery = `
+query OrganizationLookupQuery ($input: String!){
+  organization(login: $input) {
+    id
+  }
+}
+`

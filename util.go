@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -26,4 +28,24 @@ func getHomeDir() string {
 	}
 
 	return homedir
+}
+
+func LookupOrganization(Config *Config, Name string) (string, error) {
+	// Construct and execute request
+	variables := make(map[string]interface{})
+
+	variables["input"] = Name
+
+	rawResponse, err := SendApiRequest(Config.Data.Token, organizationLookupQuery, variables)
+	if err != nil {
+		return "", fmt.Errorf("could not send API request: %w", err)
+	}
+
+	responseData := OrganizationLookupQueryResponse{}
+	err = json.Unmarshal(rawResponse, &responseData)
+	if err != nil {
+		return "", fmt.Errorf("could not unmarshal response data: %w", err)
+	}
+
+	return responseData.Organization.ID, nil
 }
