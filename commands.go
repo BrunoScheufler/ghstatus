@@ -28,7 +28,7 @@ set [emoji] [status] - Set new status
 	fmt.Println(fmt.Sprintf(helpMenu, aurora.Bold("ghstatus"), aurora.Bold("Available commands:"), aurora.Bold("Available arguments:")))
 }
 
-func setCommand(config *Config, organization *string, limited *bool, args []string) error {
+func setCommand(config *Config, organization, expiresIn *string, limited *bool, args []string) error {
 	if config.Data.Token == "" {
 		return errors.New("Please set your auth token for GitHub in the configuration file first!")
 	}
@@ -46,6 +46,7 @@ func setCommand(config *Config, organization *string, limited *bool, args []stri
 		Message:             message,
 		Organization:        organization,
 		LimitedAvailability: limited,
+		ExpiresAt:           expiresIn,
 	}
 	updatedStatus, err := UpdateStatus(&updateStatusInput)
 	if err != nil {

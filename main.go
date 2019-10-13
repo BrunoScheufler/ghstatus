@@ -12,7 +12,9 @@ import (
 func main() {
 	// Declare and parse flags to be used
 	configPath := flag.String("config", "~/.config/ghstatus/config.json", "configuration file path")
+
 	organization := flag.String("org", "", "organization name")
+	expiresIn := flag.String("expire", "", "status should expire after duration")
 	busy := flag.Bool("busy", false, "limited availability")
 
 	flag.Parse()
@@ -67,7 +69,7 @@ func main() {
 	// Match first arg
 	switch flag.Arg(0) {
 	case "set":
-		err := setCommand(config, organization, busy, args[1:])
+		err := setCommand(config, organization, expiresIn, busy, args[1:])
 		if err != nil {
 			fmt.Println(aurora.Red(err.Error()))
 			os.Exit(1)

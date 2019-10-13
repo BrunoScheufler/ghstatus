@@ -9,6 +9,7 @@ import (
 	"github.com/logrusorgru/aurora"
 	"strings"
 	"text/template"
+	"time"
 )
 
 func GetCurrentStatus(c *Config) (*UserStatus, error) {
@@ -53,17 +54,29 @@ func UpdateStatus(input *UpdateStatusInput) (*UserStatus, error) {
 		Emoji:   input.Emoji,
 	}
 
-	// Add organization to variables
+	// Handle status expiry, add to variables
+	if input.ExpiresAt != nil && *input.ExpiresAt != "" {
+		duration, err := time.ParseDuration(*input.ExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse duration for expiresAt value: %w", err)
+		}
+
+		now := time.Now()
+
+		updateInput.ExpiresAt = now.Add(duration).UTC().Format(time.RFC3339Nano)
+	}
+
+	// Handle organization, add to variables
 	if input.Organization != nil {
 		if *input.Organization != "" {
-			// TODO add org support (requires another query to fetch organizationId by name)
+			// TODO Add org support (requires another query to fetch organizationId by name)
 			fmt.Println("Note: Supplying an organization is currently not supported")
 		} else {
 			updateInput.OrganizationId = *input.Organization
 		}
 	}
 
-	// Add limitedAvailability to variables
+	// Handle limitedAvailability (busy), add to variables
 	if input.LimitedAvailability != nil {
 		updateInput.LimitedAvailability = *input.LimitedAvailability
 	}
