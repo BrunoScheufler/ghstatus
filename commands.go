@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/logrusorgru/aurora"
-	"log"
 	"strings"
 )
 
@@ -34,14 +33,17 @@ func setCommand(config *Config, organization *string, limited *bool, args []stri
 		return errors.New("Please set your auth token for GitHub in the configuration file first!")
 	}
 
-	if len(args) < 2 {
-		return errors.New("Please supply at least two arguments for the status emoji and message")
+	message := ""
+	emoji := ""
+	if len(args) > 1 {
+		emoji = args[0]
+		message = strings.Join(args[1:], " ")
 	}
 
 	updateStatusInput := UpdateStatusInput{
 		Config:              config,
-		Emoji:               args[0],
-		Message:             strings.Join(args[1:], " "),
+		Emoji:               emoji,
+		Message:             message,
 		Organization:        organization,
 		LimitedAvailability: limited,
 	}
@@ -54,18 +56,12 @@ func setCommand(config *Config, organization *string, limited *bool, args []stri
 		return errors.New("could not retrieve updated status")
 	}
 
-	fmt.Println(fmt.Sprintf(`✅ Successfully updated your status:
-Status: %s %s
-Busy: %s 
-Organization: %s
-Expires At: %s
-`,
-		updatedStatus.Emoji,
-		aurora.Bold(updatedStatus.Message),
-		aurora.Bold(updatedStatus.IndicatesLimitedAvailability),
-		aurora.Bold(updatedStatus.Organization.Name),
-		aurora.Bold(updatedStatus.ExpiresAt)),
-	)
+	formattedStatus, err := FormatStatus(updatedStatus)
+	if err != nil {
+		return fmt.Errorf("could not format status: %w", err)
+	}
+
+	fmt.Println(formattedStatus)
 
 	return nil
 }
@@ -86,8 +82,12 @@ func getCommand(config *Config) error {
 		return errors.New("could noot retrieve updated status from GitHub API")
 	}
 
-	// TODO Format and print status with Go template
-	log.Println(fmt.Sprintf("Current status: %s", status.Message))
+	formattedStatus, err := FormatStatus(status)
+	if err != nil {
+		return fmt.Errorf("could not format status: %w", err)
+	}
+
+	fmt.Println(formattedStatus)
 
 	return nil
 }

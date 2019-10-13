@@ -2,4 +2,7 @@ module github.com/BrunoScheufler/ghstatus
 
 go 1.12
 
-require github.com/logrusorgru/aurora v0.0.0-20181002194514-a7b3b318ed4e
+require (
+	github.com/kyokomi/emoji v2.1.0+incompatible
+	github.com/logrusorgru/aurora v0.0.0-20181002194514-a7b3b318ed4e
+)
