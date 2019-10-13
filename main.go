@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/logrusorgru/aurora"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +12,11 @@ import (
 func main() {
 	// Declare and parse flags to be used
 	configPath := flag.String("config", "~/.config/ghstatus/config.json", "configuration file path")
+
 	organization := flag.String("org", "", "organization name")
+	expiresIn := flag.String("expire", "", "status should expire after duration")
 	busy := flag.Bool("busy", false, "limited availability")
+
 	flag.Parse()
 
 	// Check if config is in home directory
@@ -31,18 +35,18 @@ func main() {
 		*configPath = absPath
 	}
 
-	config := &Config{path: *configPath}
+	config := &Config{Path: *configPath}
 
 	// Check if config exists, otherwise use default config
-	if !configExists(*configPath) {
-		config.data = DefaultConfig
-		err := config.write(false)
+	if !ConfigExists(*configPath) {
+		config.Data = DefaultConfig
+		err := config.Write(false)
 		if err != nil {
 			println("Failed to write to config:", err.Error())
 			os.Exit(1)
 		}
 	} else {
-		err := config.load()
+		err := config.Load()
 		if err != nil {
 			println("Failed to load config:", err.Error())
 			os.Exit(1)
@@ -53,16 +57,31 @@ func main() {
 
 	// Handle case if no args were supplied
 	if len(args) == 0 {
-		getCommand(config)
+		err := getCommand(config)
+		if err != nil {
+			fmt.Println(aurora.Red(err.Error()))
+			os.Exit(1)
+			return
+		}
 		os.Exit(0)
 	}
 
 	// Match first arg
-	switch args[0] {
+	switch flag.Arg(0) {
 	case "set":
-		setCommand(config, organization, busy, args[1:])
+		err := setCommand(config, organization, expiresIn, busy, args[1:])
+		if err != nil {
+			fmt.Println(aurora.Red(err.Error()))
+			os.Exit(1)
+			return
+		}
 	case "get":
-		getCommand(config)
+		err := getCommand(config)
+		if err != nil {
+			fmt.Println(aurora.Red(err.Error()))
+			os.Exit(1)
+			return
+		}
 	case "config":
 		configCommand(config)
 		break
@@ -72,14 +91,4 @@ func main() {
 		helpCommand()
 		break
 	}
-}
-
-func configExists(path string) bool {
-	exists, err := fileExists(path)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	return exists
 }

@@ -1,13 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"strings"
 )
 
 func configCommand(config *Config) {
-	fmt.Println(fmt.Sprintf("The current configuration is located at %v.", aurora.Cyan(config.path)))
+	fmt.Println(fmt.Sprintf("The current configuration is located at %v.", aurora.Cyan(config.Path)))
 }
 
 func helpCommand() {
@@ -27,33 +28,67 @@ set [emoji] [status] - Set new status
 	fmt.Println(fmt.Sprintf(helpMenu, aurora.Bold("ghstatus"), aurora.Bold("Available commands:"), aurora.Bold("Available arguments:")))
 }
 
-func setCommand(config *Config, organization *string, limited *bool, args []string) {
-	if !validateTokenSet(config) {
-		fmt.Println(aurora.Red("Please set your auth token for GitHub in the configuration file first!"))
-		return
+func setCommand(config *Config, organization, expiresIn *string, limited *bool, args []string) error {
+	if config.Data.Token == "" {
+		return errors.New("Please set your auth token for GitHub in the configuration file first!")
 	}
 
-	if len(args) < 2 {
-		fmt.Println(aurora.Red("Please supply at least two arguments for the status emoji and message"))
-		return
+	message := ""
+	emoji := ""
+	if len(args) > 1 {
+		emoji = args[0]
+		message = strings.Join(args[1:], " ")
 	}
 
-	err := set(config, args[0], strings.Join(args[1:], " "), organization, limited)
+	updateStatusInput := UpdateStatusInput{
+		Config:              config,
+		Emoji:               emoji,
+		Message:             message,
+		Organization:        organization,
+		LimitedAvailability: limited,
+		ExpiresAt:           expiresIn,
+	}
+	updatedStatus, err := UpdateStatus(&updateStatusInput)
 	if err != nil {
-		fmt.Println(aurora.Red(fmt.Sprintf("Failed to send status update: %v.", err.Error())))
+		return fmt.Errorf("could not send status update: %w", err)
 	}
+
+	if updatedStatus == nil {
+		return errors.New("could not retrieve updated status")
+	}
+
+	formattedStatus, err := FormatStatus(updatedStatus)
+	if err != nil {
+		return fmt.Errorf("could not format status: %w", err)
+	}
+
+	fmt.Println(formattedStatus)
+
+	return nil
 }
 
-func getCommand(config *Config) {
-	if !validateTokenSet(config) {
-		fmt.Println(aurora.Red("Please set your auth token for GitHub in the configuration file first!"))
-		return
+func getCommand(config *Config) error {
+	if config.Data.Token == "" {
+		return errors.New("Please set your auth token for GitHub in the configuration file first!")
 	}
 
 	fmt.Println(aurora.Gray("Retrieving your current status..."))
 
-	err := get(config)
+	status, err := GetCurrentStatus(config)
 	if err != nil {
-		fmt.Println(aurora.Red(fmt.Sprintf("Failed to send status request: %v.", err.Error())))
+		return fmt.Errorf("could not send request for current status: %w", err)
 	}
+
+	if status == nil {
+		return errors.New("could noot retrieve updated status from GitHub API")
+	}
+
+	formattedStatus, err := FormatStatus(status)
+	if err != nil {
+		return fmt.Errorf("could not format status: %w", err)
+	}
+
+	fmt.Println(formattedStatus)
+
+	return nil
 }

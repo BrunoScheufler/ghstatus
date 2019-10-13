@@ -1,14 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/logrusorgru/aurora"
-	"github.com/mitchellh/mapstructure"
-	"io/ioutil"
-	"net/http"
 	"os"
 )
 
@@ -36,87 +30,22 @@ func getHomeDir() string {
 	return homedir
 }
 
-func sendAPIRequest(token, query string, variables map[string]interface{}) (*GraphQLResponseBody, error) {
-	// Create graphql-compatible body
-	gqlBody := &GraphQLRequestBody{
-		Query:         query,
-		Variables:     variables,
-		OperationName: nil,
-	}
+func LookupOrganization(Config *Config, Name string) (string, error) {
+	// Construct and execute request
+	variables := make(map[string]interface{})
 
-	// Serialize request body
-	jsonBody, err := json.Marshal(gqlBody)
+	variables["input"] = Name
+
+	rawResponse, err := SendApiRequest(Config.Data.Token, organizationLookupQuery, variables)
 	if err != nil {
-		return &GraphQLResponseBody{}, err
+		return "", fmt.Errorf("could not send API request: %w", err)
 	}
 
-	body := bytes.NewBuffer(jsonBody)
-
-	// Create client
-	client := &http.Client{}
-
-	// Create request
-	req, err := http.NewRequest("POST", "https://api.github.com/graphql", body)
+	responseData := OrganizationLookupQueryResponse{}
+	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {
-		return &GraphQLResponseBody{}, err
+		return "", fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
-	// Add request headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", token))
-
-	// Send request
-	res, err := client.Do(req)
-	if err != nil {
-		return &GraphQLResponseBody{}, err
-	}
-
-	// Check response status code
-	if res.StatusCode == http.StatusUnauthorized {
-		return &GraphQLResponseBody{}, errors.New("received 'Unauthorized' response, please add a valid token")
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return &GraphQLResponseBody{}, errors.New(fmt.Sprintf("request failed with status %v: %v", res.StatusCode, res.Status))
-	}
-
-	// Read all incoming bytes of response body
-	rawResponseBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return &GraphQLResponseBody{}, err
-	}
-
-	responseBody := &GraphQLResponseBody{}
-
-	// Infuse response body into responseBody
-	err = json.Unmarshal(rawResponseBody, responseBody)
-	if err != nil {
-		return &GraphQLResponseBody{}, err
-	}
-
-	return responseBody, nil
-}
-
-func validateTokenSet(c *Config) bool {
-	return c.data.Token != ""
-}
-
-func handleGraphQLErrors(response *GraphQLResponseBody) error {
-	// Handle potential errors
-	if len(response.Errors) > 0 {
-		for _, e := range response.Errors {
-			gqlError := GraphQLError{}
-
-			err := mapstructure.Decode(e, &gqlError)
-			if err != nil {
-				continue
-			}
-
-			fmt.Println(aurora.Red(fmt.Sprintf("GraphQL Error: %v.", gqlError.Message)))
-		}
-
-		return errors.New("request failed")
-	}
-
-	return nil
+	return responseData.Organization.ID, nil
 }

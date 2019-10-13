@@ -1,103 +1,141 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/kyokomi/emoji"
 	"github.com/logrusorgru/aurora"
-	"github.com/mitchellh/mapstructure"
 	"strings"
+	"text/template"
+	"time"
 )
 
-func get(c *Config) error {
+func GetCurrentStatus(c *Config) (*UserStatus, error) {
 	// Construct and execute request
-	variables := map[string]interface{}{}
-	response, err := sendAPIRequest(c.data.Token, retrievalQuery, variables)
+	variables := make(map[string]interface{})
+	rawResponse, err := SendApiRequest(c.Data.Token, retrievalQuery, variables)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("could not send API request: %w", err)
 	}
 
-	// Handle GraphQL errors
-	err = handleGraphQLErrors(response)
+	responseData := RetrieveUserStatusQueryResponse{}
+	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
-	responseData := RetrievalQueryResponseData{}
-
-	// Try to decode body
-	err = mapstructure.Decode(response.Data, &responseData)
-	if err != nil {
-		return err
-	}
-
-	status := responseData.Viewer.Status
-
-	// Print status
-	fmt.Println(aurora.Bold("Current status:"), emoji.Sprint(status.Emoji), status.Message)
-
-	// Check if visibility is limited to organization
-	if status.Organization.Name != "" {
-		fmt.Println(fmt.Sprintf("Status visible to %v.", aurora.Bold(status.Organization.Name)))
-	}
-
-	// Print availability
-	if status.IndicatesLimitedAvailability == true {
-		fmt.Println(aurora.Bold("Your availability is marked as limited."))
-	}
-
-	return nil
+	return &responseData.Viewer.Status, nil
 }
 
-func set(c *Config, emoji, message string, organization *string, limitedAvailability *bool) error {
+type UpdateStatusInput struct {
+	Config *Config
+
+	Emoji   string
+	Message string
+
+	ExpiresAt           *string
+	Organization        *string
+	LimitedAvailability *bool
+}
+
+func UpdateStatus(input *UpdateStatusInput) (*UserStatus, error) {
 	// Validate emoji
-	if !strings.HasPrefix(emoji, ":") || !strings.HasSuffix(emoji, ":") {
-		return errors.New("invalid emoji format, please supply a valid emoji")
+	if input.Emoji != "" && (!strings.HasPrefix(input.Emoji, ":") || !strings.HasSuffix(input.Emoji, ":")) {
+		return nil, errors.New("invalid emoji format, please supply a valid emoji")
 	}
 
 	// Construct and send query
-	variables := map[string]interface{}{"emoji": emoji, "message": message}
+	variables := make(map[string]interface{})
 
-	// Add organization to variables
-	if organization != nil && *organization != "" {
-		// TODO add org support (requires another query to fetch organizationId by name)
-		fmt.Println("Note: Supplying an organization is currently not supported")
+	updateInput := UpdateStatusMutationInput{
+		Message: input.Message,
+		Emoji:   input.Emoji,
 	}
 
-	// Add limitedAvailability to variables
-	if limitedAvailability != nil {
-		variables["limitedAvailability"] = *limitedAvailability
+	// Handle status expiry, add to variables
+	if input.ExpiresAt != nil && *input.ExpiresAt != "" {
+		duration, err := time.ParseDuration(*input.ExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse duration for expiresAt value: %w", err)
+		}
+
+		now := time.Now()
+
+		updateInput.ExpiresAt = now.Add(duration).UTC().Format(time.RFC3339Nano)
 	}
 
-	response, err := sendAPIRequest(c.data.Token, updateMutation, map[string]interface{}{"newStatus": variables})
+	// Handle organization, add to variables
+	if input.Organization != nil {
+		if *input.Organization != "" {
+			// Look up organization by name (login)
+			orgId, err := LookupOrganization(input.Config, *input.Organization)
+			if err != nil {
+				return nil, fmt.Errorf("could not lookup organization by name: %w", err)
+			}
+			updateInput.OrganizationId = orgId
+		} else {
+			updateInput.OrganizationId = *input.Organization
+		}
+	}
+
+	// Handle limitedAvailability (busy), add to variables
+	if input.LimitedAvailability != nil {
+		updateInput.LimitedAvailability = *input.LimitedAvailability
+	}
+
+	variables["input"] = updateInput
+
+	rawResponse, err := SendApiRequest(input.Config.Data.Token, updateMutation, variables)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("could not send API request: %w", err)
 	}
 
-	err = handleGraphQLErrors(response)
+	responseData := UpdateUserStatusMutationResponse{}
+	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
-	responseData := UpdateMutationResponseData{}
+	return &responseData.ChangeUserStatus.Status, nil
+}
 
-	// Try to decode body
-	err = mapstructure.Decode(response.Data, &responseData)
+func FormatStatus(status *UserStatus) (string, error) {
+	if status.Message == "" {
+		return "👉 Status not set.", nil
+	}
+
+	templateFuncs := template.FuncMap{
+		"printEmoji": func(text string) string {
+			if text == "" {
+				return ""
+			}
+			return emoji.Sprint(text)
+		},
+		"isEmptyString": func(str string) bool {
+			return str == ""
+		},
+		"formatBold": func(content interface{}) string {
+			return aurora.Bold(content).String()
+		},
+	}
+
+	tpl, err := template.New("status-template").Funcs(templateFuncs).Parse(`
+{{ formatBold "Status" }}: {{ printEmoji .Emoji }}{{ .Message }}
+🚫 Busy: {{ formatBold .IndicatesLimitedAvailability }}
+⏱  {{ if isEmptyString .ExpiresAt }}Status does not expire. {{else}} Expires at {{ .ExpiresAt }} {{end}}
+🏢 {{ if isEmptyString .Organization.Name }}Visible for everyone {{ else }} Visible for {{ .Organization.Name}} {{ end }}
+`)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("could not create status template: %w", err)
 	}
 
-	status := responseData.ChangeUserStatus.Status
-
-	// Detect if some changes weren't applied as planned
-	if status.Message != message ||
-		status.Emoji != emoji ||
-		(organization != nil && status.Organization.Name != *organization) ||
-		(limitedAvailability != nil && status.IndicatesLimitedAvailability != *limitedAvailability) {
-		return errors.New("some fields were not updated accordingly, please try again")
+	var buf bytes.Buffer
+	err = tpl.Execute(&buf, status)
+	if err != nil {
+		return "", fmt.Errorf("could not execute template: %w", err)
 	}
 
-	fmt.Println(aurora.Green("🎉 Updated your status!"))
-
-	return nil
+	return buf.String(), nil
 }
