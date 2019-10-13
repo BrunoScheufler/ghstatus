@@ -1,14 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
+	"context"
 	"fmt"
-	"github.com/logrusorgru/aurora"
-	"github.com/mitchellh/mapstructure"
-	"io/ioutil"
-	"net/http"
+	"github.com/machinebox/graphql"
 	"os"
 )
 
@@ -36,87 +31,24 @@ func getHomeDir() string {
 	return homedir
 }
 
-func sendAPIRequest(token, query string, variables map[string]interface{}) (*GraphQLResponseBody, error) {
-	// Create graphql-compatible body
-	gqlBody := &GraphQLRequestBody{
-		Query:         query,
-		Variables:     variables,
-		OperationName: nil,
+func sendAPIRequest(token, query string, variables map[string]interface{}) (interface{}, error) {
+	client := graphql.NewClient("https://api.github.com/graphql")
+	request := graphql.NewRequest(query)
+
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	for k, v := range variables {
+		request.Var(k, v)
 	}
 
-	// Serialize request body
-	jsonBody, err := json.Marshal(gqlBody)
+	// Create new context
+	ctx := context.Background()
+
+	var responseData interface{}
+	err := client.Run(ctx, request, &responseData)
 	if err != nil {
-		return &GraphQLResponseBody{}, err
+		return nil, fmt.Errorf("could not send GitHub GraphQL API request: %w", err)
 	}
 
-	body := bytes.NewBuffer(jsonBody)
-
-	// Create client
-	client := &http.Client{}
-
-	// Create request
-	req, err := http.NewRequest("POST", "https://api.github.com/graphql", body)
-	if err != nil {
-		return &GraphQLResponseBody{}, err
-	}
-
-	// Add request headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", token))
-
-	// Send request
-	res, err := client.Do(req)
-	if err != nil {
-		return &GraphQLResponseBody{}, err
-	}
-
-	// Check response status code
-	if res.StatusCode == http.StatusUnauthorized {
-		return &GraphQLResponseBody{}, errors.New("received 'Unauthorized' response, please add a valid token")
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return &GraphQLResponseBody{}, errors.New(fmt.Sprintf("request failed with status %v: %v", res.StatusCode, res.Status))
-	}
-
-	// Read all incoming bytes of response body
-	rawResponseBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return &GraphQLResponseBody{}, err
-	}
-
-	responseBody := &GraphQLResponseBody{}
-
-	// Infuse response body into responseBody
-	err = json.Unmarshal(rawResponseBody, responseBody)
-	if err != nil {
-		return &GraphQLResponseBody{}, err
-	}
-
-	return responseBody, nil
-}
-
-func validateTokenSet(c *Config) bool {
-	return c.data.Token != ""
-}
-
-func handleGraphQLErrors(response *GraphQLResponseBody) error {
-	// Handle potential errors
-	if len(response.Errors) > 0 {
-		for _, e := range response.Errors {
-			gqlError := GraphQLError{}
-
-			err := mapstructure.Decode(e, &gqlError)
-			if err != nil {
-				continue
-			}
-
-			fmt.Println(aurora.Red(fmt.Sprintf("GraphQL Error: %v.", gqlError.Message)))
-		}
-
-		return errors.New("request failed")
-	}
-
-	return nil
+	return responseData, nil
 }

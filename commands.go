@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/logrusorgru/aurora"
+	"log"
 	"strings"
 )
 
@@ -28,7 +29,7 @@ set [emoji] [status] - Set new status
 }
 
 func setCommand(config *Config, organization *string, limited *bool, args []string) {
-	if !validateTokenSet(config) {
+	if config.data.Token == "" {
 		fmt.Println(aurora.Red("Please set your auth token for GitHub in the configuration file first!"))
 		return
 	}
@@ -38,22 +39,24 @@ func setCommand(config *Config, organization *string, limited *bool, args []stri
 		return
 	}
 
-	err := set(config, args[0], strings.Join(args[1:], " "), organization, limited)
+	err := UpdateStatus(config, args[0], strings.Join(args[1:], " "), organization, limited)
 	if err != nil {
 		fmt.Println(aurora.Red(fmt.Sprintf("Failed to send status update: %v.", err.Error())))
 	}
 }
 
 func getCommand(config *Config) {
-	if !validateTokenSet(config) {
+	if config.data.Token == "" {
 		fmt.Println(aurora.Red("Please set your auth token for GitHub in the configuration file first!"))
 		return
 	}
 
 	fmt.Println(aurora.Gray("Retrieving your current status..."))
 
-	err := get(config)
+	status, err := GetCurrentStatus(config)
 	if err != nil {
 		fmt.Println(aurora.Red(fmt.Sprintf("Failed to send status request: %v.", err.Error())))
 	}
+
+	log.Println(fmt.Sprintf("Current status: %s", status))
 }

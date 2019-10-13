@@ -1,84 +1,39 @@
 package main
 
-type GraphQLRequestBody struct {
-	Variables     interface{} `json:"variables"`
-	Query         string      `json:"query"`
-	OperationName *string     `json:"operationName"`
-}
-
-type GraphQLResponseBody struct {
-	Data   map[string]interface{}   `json:"data"`
-	Errors []map[string]interface{} `json:"errors"`
-}
-
-type GraphQLError struct {
-	Message string `json:"message"`
-}
-
 // GitHub types
-
-type Org struct {
-	Name string `json:"name"`
-}
-
-type Status struct {
-	CreatedAt                    string `json:"createdAt"`
-	Emoji                        string `json:"emoji"`
-	Id                           string `json:"id"`
-	IndicatesLimitedAvailability bool   `json:"indicatesLimitedAvailability"`
-	Message                      string `json:"message"`
-	Organization                 Org    `json:"organization"`
-	UpdatedAt                    string `json:"updatedAt"`
-}
-
-type RetrievalQueryResponseData struct {
-	Viewer Viewer `json:"viewer,omitempty"`
-}
-
-type Viewer struct {
-	Status Status `json:"status,omitempty"`
-}
-
-type UpdateMutationResponseData struct {
-	ChangeUserStatus ChangeUserStatusMutation `json:"changeUserStatus,omitempty"`
-}
-
-type ChangeUserStatusMutation struct {
-	Status Status `json:"status,omitempty"`
-}
 
 // Queries & Mutations
 
-var retrievalQuery = `
-query getStatus {
-  viewer {
-    status {
-      createdAt
-      message
-      emoji
-      indicatesLimitedAvailability
-      organization {
-        name
-        id
-      }
-    }
-  }
+var statusFragment = `
+fragment StatusFragment on UserStatus {
+	createdAt
+	updatedAt
+	expiresAt
+	message
+	emoji
+	indicatesLimitedAvailability
+	organization {
+		name
+	}
 }
 `
 
-var updateMutation = `
-mutation ($newStatus: ChangeUserStatusInput!) {
-  changeUserStatus(input: $newStatus) {
+var retrievalQuery = `
+query StatusRetrievalQuery {
+  viewer {
     status {
-      id
-      message
-      emoji
-      indicatesLimitedAvailability
-      organization {
-        name
-        id
-      }
+      ...StatusFragment
     }
   }
 }
-`
+` + statusFragment
+
+var updateMutation = `
+mutation UpdateUserStatusMutation ($newStatus: ChangeUserStatusInput!) {
+  changeUserStatus(input: $newStatus) {
+    status {
+      ...StatusFragment
+    }
+  }
+}
+` + statusFragment

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -45,4 +46,14 @@ func (c *Config) load() error {
 	}
 
 	return json.Unmarshal(data, &c.data)
+}
+
+func configExists(path string) bool {
+	exists, err := fileExists(path)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	return exists
 }

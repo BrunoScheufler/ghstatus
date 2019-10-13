@@ -13,6 +13,7 @@ func main() {
 	configPath := flag.String("config", "~/.config/ghstatus/config.json", "configuration file path")
 	organization := flag.String("org", "", "organization name")
 	busy := flag.Bool("busy", false, "limited availability")
+
 	flag.Parse()
 
 	// Check if config is in home directory
@@ -58,7 +59,7 @@ func main() {
 	}
 
 	// Match first arg
-	switch args[0] {
+	switch flag.Arg(0) {
 	case "set":
 		setCommand(config, organization, busy, args[1:])
 	case "get":
@@ -72,14 +73,4 @@ func main() {
 		helpCommand()
 		break
 	}
-}
-
-func configExists(path string) bool {
-	exists, err := fileExists(path)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	return exists
 }
