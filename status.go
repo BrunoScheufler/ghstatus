@@ -3,14 +3,15 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/logrusorgru/aurora"
 	"log"
 	"strings"
 )
 
 func GetCurrentStatus(c *Config) (string, error) {
 	// Construct and execute request
-	variables := map[string]interface{}{}
-	response, err := sendAPIRequest(c.data.Token, retrievalQuery, variables)
+	variables := make(map[string]interface{})
+	response, err := sendAPIRequest(c.Data.Token, retrievalQuery, variables)
 	if err != nil {
 		return "", fmt.Errorf("could not send API request: %w", err)
 	}
@@ -50,58 +51,69 @@ func GetCurrentStatus(c *Config) (string, error) {
 	return "test", nil
 }
 
-func UpdateStatus(c *Config, emoji, message string, organization *string, limitedAvailability *bool) error {
+type UpdateStatusInput struct {
+	Config *Config
+
+	Emoji   string
+	Message string
+
+	ExpiresAt           *string
+	Organization        *string
+	LimitedAvailability *bool
+}
+
+func UpdateStatus(input *UpdateStatusInput) error {
 	// Validate emoji
-	if !strings.HasPrefix(emoji, ":") || !strings.HasSuffix(emoji, ":") {
+	if !strings.HasPrefix(input.Emoji, ":") || !strings.HasSuffix(input.Emoji, ":") {
 		return errors.New("invalid emoji format, please supply a valid emoji")
 	}
 
 	// Construct and send query
-	variables := map[string]interface{}{"emoji": emoji, "message": message}
+	variables := make(map[string]interface{})
+
+	updateInput := UpdateStatusMutationInput{
+		Message: input.Message,
+		Emoji:   input.Emoji,
+	}
 
 	// Add organization to variables
-	if organization != nil && *organization != "" {
+	if input.Organization != nil {
 		// TODO add org support (requires another query to fetch organizationId by name)
 		fmt.Println("Note: Supplying an organization is currently not supported")
 	}
 
 	// Add limitedAvailability to variables
-	if limitedAvailability != nil {
-		variables["limitedAvailability"] = *limitedAvailability
+	if input.LimitedAvailability != nil {
+		variables["limitedAvailability"] = *input.LimitedAvailability
 	}
 
-	response, err := sendAPIRequest(c.data.Token, updateMutation, map[string]interface{}{"newStatus": variables})
+	variables["input"] = updateInput
+
+	rawResponse, err := SendApiRequest(input.Config.Data.Token, updateMutation, variables)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not send API request: %w", err)
 	}
 
-	log.Println(response)
+	responseData, ok := rawResponse.(UpdateUserStatusMutationResponse)
+	if !ok {
+		return fmt.Errorf("could not cast response into expected type: %w", err)
+	}
 
-	//err = handleGraphQLErrors(response)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//responseData := UpdateMutationResponseData{}
-	//
-	//// Try to decode body
-	//err = mapstructure.Decode(response.Data, &responseData)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//status := responseData.ChangeUserStatus.Status
-	//
-	//// Detect if some changes weren't applied as planned
-	//if status.Message != message ||
-	//	status.Emoji != emoji ||
-	//	(organization != nil && status.Organization.Name != *organization) ||
-	//	(limitedAvailability != nil && status.IndicatesLimitedAvailability != *limitedAvailability) {
-	//	return errors.New("some fields were not updated accordingly, please try again")
-	//}
-	//
-	//fmt.Println(aurora.Green("🎉 Updated your status!"))
-	//
-	//return nil
+	updatedStatus := responseData.ChangeUserStatus.Status
+
+	// TODO Use template here
+	fmt.Println(fmt.Sprintf(`✅ Successfully updated your status:
+Status: %s %s
+Busy: %s 
+Organization: %s
+Expires At: %s
+`,
+		updatedStatus.Emoji,
+		aurora.Bold(updatedStatus.Message),
+		aurora.Bold(updatedStatus.IndicatesLimitedAvailability),
+		aurora.Bold(updatedStatus.Organization.Name),
+		aurora.Bold(updatedStatus.ExpiresAt)),
+	)
+
 	return nil
 }
