@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,9 +15,10 @@ func GetCurrentStatus(c *Config) (*UserStatus, error) {
 		return nil, fmt.Errorf("could not send API request: %w", err)
 	}
 
-	responseData, ok := rawResponse.(RetrieveUserStatusQueryResponse)
-	if !ok {
-		return nil, errors.New("could not cast response data into expected type")
+	responseData := RetrieveUserStatusQueryResponse{}
+	err = json.Unmarshal(rawResponse, &responseData)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
 	return &responseData.Viewer.Status, nil
@@ -65,12 +67,11 @@ func UpdateStatus(input *UpdateStatusInput) (*UserStatus, error) {
 		return nil, fmt.Errorf("could not send API request: %w", err)
 	}
 
-	responseData, ok := rawResponse.(UpdateUserStatusMutationResponse)
-	if !ok {
-		return nil, errors.New("could not cast response into expected type")
+	responseData := UpdateUserStatusMutationResponse{}
+	err = json.Unmarshal(rawResponse, &responseData)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal response data: %w", err)
 	}
 
-	updatedStatus := responseData.ChangeUserStatus.Status
-
-	return &updatedStatus, nil
+	return &responseData.ChangeUserStatus.Status, nil
 }

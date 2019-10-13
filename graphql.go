@@ -1,31 +1,102 @@
 package main
 
 import (
-	"context"
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/machinebox/graphql"
+	"io/ioutil"
+	"net/http"
+	"time"
 )
 
-func SendApiRequest(token, query string, variables map[string]interface{}) (interface{}, error) {
-	client := graphql.NewClient("https://api.github.com/graphql")
-	request := graphql.NewRequest(query)
+func SendApiRequest(token, query string, variables map[string]interface{}) (json.RawMessage, error) {
+	requestHeaders := make(map[string]string)
+	requestHeaders["Authorization"] = fmt.Sprintf("Bearer %s", token)
+	requestHeaders["Content-Type"] = "application/json"
 
-	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	for k, v := range variables {
-		request.Var(k, v)
+	requestInput := SendRequestInput{
+		Endpoint: "https://api.github.com/graphql",
+		Headers:  requestHeaders,
+		Body: &GraphQLRequestBody{
+			Query:     query,
+			Variables: variables,
+		},
 	}
-
-	// Create new context
-	ctx := context.Background()
-
-	var responseData interface{}
-	err := client.Run(ctx, request, &responseData)
+	response, err := SendGraphQLRequest(&requestInput)
 	if err != nil {
-		return nil, fmt.Errorf("could not send GitHub GraphQL API request: %w", err)
+		return nil, fmt.Errorf("could not send GraphQL request: %w", err)
 	}
 
-	return responseData, nil
+	if len(response.Errors) > 0 {
+		return nil, errors.New(fmt.Sprintf("response contained errors: %s", response.Errors[0].Message))
+	}
+
+	return response.Data, nil
+}
+
+type GraphQLRequestBody struct {
+	Query         string                 `json:"query"`
+	Variables     map[string]interface{} `json:"variables"`
+	OperationName string                 `json:"operationName,omitempty"`
+}
+
+type GraphQLError struct {
+	Message string `json:"message"`
+}
+
+type GraphQLResponseBody struct {
+	Errors []GraphQLError  `json:"errors"`
+	Data   json.RawMessage `json:"data"`
+}
+
+type SendRequestInput struct {
+	Endpoint string
+	Headers  map[string]string
+	Body     *GraphQLRequestBody
+}
+
+func SendGraphQLRequest(input *SendRequestInput) (*GraphQLResponseBody, error) {
+	client := http.Client{
+		Timeout: time.Second * 5,
+	}
+
+	body, err := json.Marshal(input.Body)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal request body: %w", err)
+	}
+
+	request, err := http.NewRequest("POST", input.Endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("could not create request: %w", err)
+	}
+
+	for k, v := range input.Headers {
+		request.Header.Set(k, v)
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("could not send request: %w", err)
+	}
+
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("request returned non-200 response status")
+	}
+
+	rawResponseBody, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("could not read response body: %w", err)
+	}
+
+	responseBody := GraphQLResponseBody{}
+
+	err = json.Unmarshal(rawResponseBody, &responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal response body: %w", err)
+	}
+
+	return &responseBody, nil
 }
 
 // GitHub types
@@ -56,7 +127,7 @@ type UserStatus struct {
 	Emoji                        string `json:"emoji"`
 	ExpiresAt                    string `json:"expiresAt"`
 	ID                           string `json:"id"`
-	IndicatesLimitedAvailability string `json:"indicatesLimitedAvailability"`
+	IndicatesLimitedAvailability bool   `json:"indicatesLimitedAvailability"`
 	Message                      string
 	Organization                 struct {
 		ID   string `json:"id"`
